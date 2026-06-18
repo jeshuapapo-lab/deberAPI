@@ -9,8 +9,13 @@ $mensaje = '';
 if (isset($_GET['registro']) && $_GET['registro'] === 'ok') {
     $mensaje = 'Cuenta creada correctamente. Ya puedes iniciar sesión.';
 }
+
 if (isset($_GET['error'])) {
-    $mensaje = 'Correo o contraseña incorrectos.';
+    if ($_GET['error'] === 'servidor') {
+        $mensaje = 'Ocurrió un error interno al iniciar sesión. Intenta nuevamente.';
+    } else {
+        $mensaje = 'Correo o contraseña incorrectos.';
+    }
 }
 ?>
 <!DOCTYPE html>
