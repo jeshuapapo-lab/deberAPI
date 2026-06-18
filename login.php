@@ -6,43 +6,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-try {
-    require __DIR__ . '/conexion.php';
+require __DIR__ . '/conexion.php';
 
-    $correo = filter_input(INPUT_POST, 'correo', FILTER_VALIDATE_EMAIL);
-    $clave = $_POST['contrasena'] ?? '';
+$correo = trim($_POST['correo'] ?? '');
+$clave = $_POST['contrasena'] ?? '';
 
-    if (!$correo || $clave === '') {
-        header('Location: index.php?error=credenciales');
-        exit;
-    }
+if (!filter_var($correo, FILTER_VALIDATE_EMAIL) || $clave === '') {
+    header('Location: index.php?error=credenciales');
+    exit;
+}
 
-    $stmt = $conexion->prepare('SELECT id, nombre, correo, contrasena FROM usuarios WHERE correo = ? LIMIT 1');
+$correoSeguro = $conexion->real_escape_string($correo);
+$resultado = $conexion->query("SELECT id, nombre, correo, contrasena FROM usuarios WHERE correo = '$correoSeguro' LIMIT 1");
 
-    if (!$stmt) {
-        throw new Exception('No se pudo preparar la consulta.');
-    }
+if ($resultado && $resultado->num_rows === 1) {
+    $usuario = $resultado->fetch_assoc();
 
-    $stmt->bind_param('s', $correo);
-    $stmt->execute();
-    $stmt->bind_result($id, $nombre, $correoGuardado, $hash);
-
-    if ($stmt->fetch() && password_verify($clave, $hash)) {
-        $stmt->close();
-        session_regenerate_id(true);
-        $_SESSION['usuario_id'] = $id;
-        $_SESSION['usuario_nombre'] = $nombre;
-        $_SESSION['usuario_correo'] = $correoGuardado;
+    if (password_verify($clave, $usuario['contrasena'])) {
+        $_SESSION['usuario_id'] = (int)$usuario['id'];
+        $_SESSION['usuario_nombre'] = $usuario['nombre'];
+        $_SESSION['usuario_correo'] = $usuario['correo'];
         header('Location: dashboard.php');
         exit;
     }
-
-    $stmt->close();
-    header('Location: index.php?error=credenciales');
-    exit;
-} catch (Throwable $error) {
-    error_log('Error en login.php: ' . $error->getMessage());
-    header('Location: index.php?error=servidor');
-    exit;
 }
+
+header('Location: index.php?error=credenciales');
+exit;
 ?>
