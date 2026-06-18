@@ -1,1 +1,68 @@
-const $=id=>document.getElementById(id),form=$('formulario-clima'),input=$('buscar-ciudad'),btn=$('btn-buscar'),carga=$('indicador-carga'),error=$('mensaje-error'),resultado=$('contenedor-clima');const climaTexto=c=>c===0?'Despejado':[1,2,3].includes(c)?'Parcialmente nublado':[45,48].includes(c)?'Niebla':[51,53,55].includes(c)?'Llovizna':[61,63,65,80,81,82].includes(c)?'Lluvia':[71,73,75,77,85,86].includes(c)?'Nieve':[95,96,99].includes(c)?'Tormenta':'Condiciones variables';const climaIcono=c=>c===0?'☀️':[1,2,3].includes(c)?'⛅':[45,48].includes(c)?'🌫️':[51,53,55,61,63,65,80,81,82].includes(c)?'🌧️':[71,73,75,77,85,86].includes(c)?'❄️':[95,96,99].includes(c)?'⛈️':'🌍';const hora=iso=>new Date(iso).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});async function obtenerJson(url,mensaje){const r=await fetch(url);if(!r.ok)throw new Error(mensaje);return r.json()}async function buscar(ciudad){carga.classList.remove('hidden');resultado.classList.add('hidden');error.classList.add('hidden');btn.disabled=true;try{const geo=await obtenerJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ciudad)}&count=1&language=es&format=json`,'No se pudo consultar la ubicación.');if(!geo.results?.length)throw new Error('Ciudad no encontrada.');const u=geo.results[0];const climaUrl=`https://api.open-meteo.com/v1/forecast?latitude=${u.latitude}&longitude=${u.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;const paisUrl=`https://restcountries.com/v3.1/alpha/${u.country_code}`;const solUrl=`https://api.sunrise-sunset.org/json?lat=${u.latitude}&lng=${u.longitude}&formatted=0`;const[clima,paises,sol]=await Promise.all([obtenerJson(climaUrl,'Falló la API del clima.'),obtenerJson(paisUrl,'Falló la API del país.'),obtenerJson(solUrl,'Falló la API solar.')]);const p=paises[0],c=clima.current,d=clima.daily;$('clima-ciudad').textContent=u.name;$('clima-pais').textContent=p.translations?.spa?.common||p.name.common;$('clima-temp').textContent=Math.round(c.temperature_2m);$('clima-icono').textContent=climaIcono(c.weather_code);$('clima-descripcion').textContent=climaTexto(c.weather_code);$('clima-fecha').textContent=c.time.replace('T',' ');$('detalle-termica').textContent=`${Math.round(c.apparent_temperature)} °C`;$('detalle-max').textContent=`${Math.round(d.temperature_2m_max[0])} °C`;$('detalle-min').textContent=`${Math.round(d.temperature_2m_min[0])} °C`;$('detalle-humedad').textContent=`${c.relative_humidity_2m} %`;$('detalle-viento').textContent=`${c.wind_speed_10m} km/h`;$('pais-capital').textContent=p.capital?.[0]||'No disponible';$('pais-moneda').textContent=Object.values(p.currencies||{}).map(m=>m.name).join(', ')||'No disponible';$('pais-poblacion').textContent=p.population.toLocaleString('es-EC');$('pais-bandera').src=p.flags?.svg||p.flags?.png;$('sol-amanecer').textContent=hora(sol.results.sunrise);$('sol-atardecer').textContent=hora(sol.results.sunset);resultado.classList.remove('hidden');localStorage.setItem('ultimaCiudad',u.name)}catch(e){error.textContent=e.message;error.classList.remove('hidden')}finally{carga.classList.add('hidden');btn.disabled=false}}form.addEventListener('submit',e=>{e.preventDefault();const ciudad=input.value.trim();if(!ciudad){error.textContent='Escribe una ciudad.';error.classList.remove('hidden');return}buscar(ciudad)});document.addEventListener('DOMContentLoaded',()=>{const ciudad=localStorage.getItem('ultimaCiudad')||'Guayaquil';input.value=ciudad;buscar(ciudad)});
+const $=id=>document.getElementById(id),form=$('formulario-clima'),input=$('buscar-ciudad'),btn=$('btn-buscar'),carga=$('indicador-carga'),error=$('mensaje-error'),resultado=$('contenedor-clima');
+
+const climaTexto=c=>c===0?'Despejado':[1,2,3].includes(c)?'Parcialmente nublado':[45,48].includes(c)?'Niebla':[51,53,55].includes(c)?'Llovizna':[61,63,65,80,81,82].includes(c)?'Lluvia':[71,73,75,77,85,86].includes(c)?'Nieve':[95,96,99].includes(c)?'Tormenta':'Condiciones variables';
+const climaIcono=c=>c===0?'☀️':[1,2,3].includes(c)?'⛅':[45,48].includes(c)?'🌫️':[51,53,55,61,63,65,80,81,82].includes(c)?'🌧️':[71,73,75,77,85,86].includes(c)?'❄️':[95,96,99].includes(c)?'⛈️':'🌍';
+
+function formatearHora(iso,zonaHoraria){
+    if(!iso)return'No disponible';
+    return new Intl.DateTimeFormat('es-EC',{hour:'2-digit',minute:'2-digit',timeZone:zonaHoraria}).format(new Date(iso));
+}
+
+async function buscar(ciudad){
+    carga.classList.remove('hidden');
+    resultado.classList.add('hidden');
+    error.classList.add('hidden');
+    btn.disabled=true;
+
+    try{
+        const respuesta=await fetch(`api.php?ciudad=${encodeURIComponent(ciudad)}`,{headers:{Accept:'application/json'}});
+        const datos=await respuesta.json();
+
+        if(!respuesta.ok){
+            throw new Error(datos.error||'No se pudo completar la consulta.');
+        }
+
+        $('clima-ciudad').textContent=datos.ciudad;
+        $('clima-pais').textContent=datos.pais.nombre;
+        $('clima-temp').textContent=Math.round(datos.clima.temperatura);
+        $('clima-icono').textContent=climaIcono(datos.clima.codigo);
+        $('clima-descripcion').textContent=climaTexto(datos.clima.codigo);
+        $('clima-fecha').textContent=datos.clima.fecha.replace('T',' ');
+        $('detalle-termica').textContent=`${Math.round(datos.clima.sensacion)} °C`;
+        $('detalle-max').textContent=`${Math.round(datos.clima.maxima)} °C`;
+        $('detalle-min').textContent=`${Math.round(datos.clima.minima)} °C`;
+        $('detalle-humedad').textContent=`${datos.clima.humedad} %`;
+        $('detalle-viento').textContent=`${datos.clima.viento} km/h`;
+        $('pais-capital').textContent=datos.pais.capital;
+        $('pais-moneda').textContent=datos.pais.moneda;
+        $('pais-poblacion').textContent=datos.pais.poblacion?datos.pais.poblacion.toLocaleString('es-EC'):'No disponible';
+        $('pais-bandera').src=datos.pais.bandera;
+        $('sol-amanecer').textContent=formatearHora(datos.sol.amanecer,datos.clima.zonaHoraria);
+        $('sol-atardecer').textContent=formatearHora(datos.sol.atardecer,datos.clima.zonaHoraria);
+        resultado.classList.remove('hidden');
+        localStorage.setItem('ultimaCiudad',datos.ciudad);
+    }catch(e){
+        error.textContent=e.message;
+        error.classList.remove('hidden');
+    }finally{
+        carga.classList.add('hidden');
+        btn.disabled=false;
+    }
+}
+
+form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const ciudad=input.value.trim();
+    if(!ciudad){
+        error.textContent='Escribe una ciudad.';
+        error.classList.remove('hidden');
+        return;
+    }
+    buscar(ciudad);
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+    const ciudad=localStorage.getItem('ultimaCiudad')||'Guayaquil';
+    input.value=ciudad;
+    buscar(ciudad);
+});
